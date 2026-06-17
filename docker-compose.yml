@@ -1,0 +1,52 @@
+version: '3.8'
+
+services:
+  # API Gateway (Nginx)
+  api-gateway:
+    image: nginx:alpine
+    ports:
+      - "8080:80"
+    volumes:
+      - ./api-gateway/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - servicio-1-procesador
+
+  # Message Broker (RabbitMQ)
+  rabbitmq:
+    image: rabbitmq:3-alpine
+    ports:
+      - "5672:5672"
+      - "15672:15672" # Puerto para el panel de administración web
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: admin123
+
+  # Base de Datos - Servicio 1 (Procesador)
+  db-procesador:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: user_proc
+      POSTGRES_PASSWORD: password_proc
+      POSTGRES_DB: db_procesador
+    ports:
+      - "5432:5432"
+
+  # Base de Datos - Servicio 2 (Validador Antifraude)
+  db-validador:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: user_val
+      POSTGRES_PASSWORD: password_val
+      POSTGRES_DB: db_validador
+    ports:
+      - "5433:5432"
+
+  # Base de Datos - Servicio 3 (Emisión de Comprobantes)
+  db-comprobantes:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: user_comp
+      POSTGRES_PASSWORD: password_comp
+      POSTGRES_DB: db_comprobantes
+    ports:
+      - "5434:5432"
