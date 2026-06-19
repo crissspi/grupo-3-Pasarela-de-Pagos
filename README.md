@@ -6,11 +6,9 @@
 - Pablo Varas Burgos
 - Joshua Jara Herrera
 
-**Máquina Virtual Asignada:** 146.83.102.22
-
 ---
 
-## 🛠️ Stack Tecnológico
+## Stack Tecnológico
 
 - **Servicios (x3):** Node.js + Express (`node:18-alpine`)
 - **Bases de Datos (x3):** PostgreSQL (`postgres:15-alpine`)
@@ -27,45 +25,6 @@
 
 A continuación se detalla el flujo asíncrono y la independencia de bases de datos de la pasarela de pagos:
 
-```mermaid
-flowchart TD
-    %% Nodos externos
-    Cliente((Frontend))
-
-    %% API Gateway
-    Gateway[API Gateway Nginx]
-
-    %% Broker Central
-    Broker{RabbitMQ Message Broker}
-
-    %% Microservicios
-    S1[Servicio 1: Procesador REST + Eventos]
-    S2[Servicio 2: Validador Event Driven]
-    S3[Servicio 3: Comprobantes Event Driven]
-
-    %% Bases de datos Aisladas
-    DB1[(PostgreSQL 1)]
-    DB2[(PostgreSQL 2)]
-    DB3[(PostgreSQL 3)]
-
-    %% Flujo REST Síncrono
-    Cliente -- "1. Petición de pago (REST)" --> Gateway
-    Gateway -- "2. Enruta tráfico" --> S1
-    S1 -- "Guarda estado: En Proceso" --> DB1
-    S1 -- "3. Responde HTTP 202 En proceso" --> Cliente
-
-    %% Flujo Asíncrono (Eventos)
-    S1 -- "4. Evento: transaccion_iniciada" --> Broker
-    Broker -- "5. Consume evento" --> S2
-    S2 -- "Valida Saldo y CVC" --> DB2
-    S2 -- "6. Evento: pago_autorizado" --> Broker
-    Broker -- "7. Consume evento" --> S3
-    S3 -- "Genera folio contable" --> DB3
-    S3 -- "8. Evento: comprobante_emitido" --> Broker
-    
-    %% Cierre del ciclo
-    Broker -- "9. Consume para actualizar a Completado" --> S1
-```
 
 ---
 
