@@ -1,0 +1,96 @@
+services:
+
+  # ─────────── Message Broker ───────────
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    ports:
+      - "15672:15672"   # panel de administración (demo)
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─────────── Servicio 1: Procesador (REST + Eventos) ───────────
+  servicio-1-procesador:
+    build: ./servicio-1-procesador
+    environment:
+      - RABBITMQ_URL=amqp://rabbitmq
+      - DB_HOST=db-svc1
+      - DB_NAME=transacciones_db
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      db-svc1:
+        condition: service_started
+
+  db-svc1:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=transacciones_db
+    volumes:
+      - db-svc1-data:/var/lib/postgresql/data
+
+  # ─────────── Servicio 2: Validador Antifraude (Event Driven) ───────────
+  servicio-2-validador:
+    build: ./servicio-2-validador
+    environment:
+      - RABBITMQ_URL=amqp://rabbitmq
+      - DB_HOST=db-svc2
+      - DB_NAME=antifraude_db
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      db-svc2:
+        condition: service_started
+
+  db-svc2:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=antifraude_db
+    volumes:
+      - db-svc2-data:/var/lib/postgresql/data
+
+  # ─────────── Servicio 3: Comprobantes (Event Driven) ───────────
+  servicio-3-comprobantes:
+    build: ./servicio-3-comprobantes
+    environment:
+      - RABBITMQ_URL=amqp://rabbitmq
+      - DB_HOST=db-svc3
+      - DB_NAME=comprobantes_db
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      db-svc3:
+        condition: service_started
+
+  db-svc3:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=comprobantes_db
+    volumes:
+      - db-svc3-data:/var/lib/postgresql/data
+
+  # ─────────── Frontend ───────────
+  frontend:
+    build: ./frontend
+
+  # ─────────── API Gateway: único punto de entrada ───────────
+  api-gateway:
+    build: ./api-gateway
+    ports:
+      - "8080:80"
+    depends_on:
+      - frontend
+      - servicio-1-procesador
+
+volumes:
+  db-svc1-data:
+  db-svc2-data:
+  db-svc3-data:
