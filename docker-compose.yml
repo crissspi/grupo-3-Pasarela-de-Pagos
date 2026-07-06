@@ -34,12 +34,15 @@ services:
   # Base de Datos - Servicio 2 (Validador Antifraude)
   db-validador:
     image: postgres:15-alpine
+    container_name: db_antifraude
     environment:
-      POSTGRES_USER: user_val
-      POSTGRES_PASSWORD: password_val
-      POSTGRES_DB: db_validador
+      POSTGRES_USER: admin_fraude
+      POSTGRES_PASSWORD: password_seguro
+      POSTGRES_DB: antifraude_db
     ports:
       - "5433:5432"
+    volumes:
+      - ./servicio-2-validador/init.sql:/docker-entrypoint-initdb.d/init.sql
 
   # Base de Datos - Servicio 3 (Emisión de Comprobantes)
   db-comprobantes:
@@ -50,3 +53,17 @@ services:
       POSTGRES_DB: db_comprobantes
     ports:
       - "5434:5432"
+
+  # Microservicio 2: Lógica de Validador Antifraude (Node.js)
+  servicio-2-validador:
+    build: ./servicio-2-validador  
+    container_name: app_antifraude
+    environment:
+      - DB_HOST=db-validador      
+      - DB_USER=admin_fraude
+      - DB_PASSWORD=password_seguro
+      - DB_NAME=antifraude_db
+      - RABBITMQ_URL=amqp://rabbitmq
+    depends_on:
+      - db-validador
+      - rabbitmq
