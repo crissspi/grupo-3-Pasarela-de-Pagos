@@ -1,0 +1,50 @@
+# Respaldo automatico de las 3 bases de datos cada 10 minutos (requisito del proyecto)
+# Los .sql quedan en un PVC independiente: sobreviven aunque maten las BD
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: backups
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 2Gi
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: backup-databases
+spec:
+  schedule: "*/10 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: pg-backup
+              image: postgres:15-alpine
+              env:
+                - name: PGPASSWORD
+                  value: postgres
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  STAMP=$(date +%Y%m%d-%H%M)
+                  pg_dump -h db-svc1 -U postgres transacciones_db > /backups/svc1-$STAMP.sql
+                  pg_dump -h db-svc2 -U postgres antifraude_db   > /backups/svc2-$STAMP.sql
+                  pg_dump -h db-svc3 -U postgres comprobantes_db > /backups/svc3-$STAMP.sql
+                  # conservar solo las ultimas 24 horas de respaldos
+                  find /backups -name '*.sql' -mmin +1440 -delete
+                  echo "Backup $STAMP completado:" && ls -lh /backups | tail -5
+              volumeMounts:
+                - name: backups
+                  mountPath: /backups
+          volumes:
+            - name: backups
+              persistentVolumeClaim:
+                claimName: backups

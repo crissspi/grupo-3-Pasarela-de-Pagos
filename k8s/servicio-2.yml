@@ -1,0 +1,27 @@
+# Servicio 2: Validador Antifraude (Event Driven, sin API HTTP)
+# 2 replicas: RabbitMQ reparte los mensajes entre consumidores (competing consumers)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: servicio-2-validador
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: servicio-2-validador
+  template:
+    metadata:
+      labels:
+        app: servicio-2-validador
+    spec:
+      containers:
+        - name: servicio-2
+          image: ghcr.io/crissspi/grupo-3-pasarela-de-pagos/servicio-2-validador:latest
+          env:
+            - name: RABBITMQ_URL
+              value: amqp://rabbitmq
+            - name: DB_HOST
+              value: db-svc2
+            - name: DB_NAME
+              value: antifraude_db
+# Sin Service: nadie le habla por red, solo consume de RabbitMQ

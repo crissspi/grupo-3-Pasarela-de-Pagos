@@ -1,0 +1,11 @@
+# Espacios logicos separados para QA y PROD (mismo cluster K3s)
+# Los demas manifiestos NO llevan namespace: se aplican con -n grupo3-qa o -n grupo3-prod
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: grupo3-qa
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: grupo3-prod

@@ -1,0 +1,27 @@
+# Servicio 3: Emision de Comprobantes (Event Driven, sin API HTTP)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: servicio-3-comprobantes
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: servicio-3-comprobantes
+  template:
+    metadata:
+      labels:
+        app: servicio-3-comprobantes
+    spec:
+      containers:
+        - name: servicio-3
+          image: ghcr.io/crissspi/grupo-3-pasarela-de-pagos/servicio-3-comprobantes:latest
+          env:
+            - name: RABBITMQ_URL
+              value: amqp://rabbitmq
+            - name: DB_HOST
+              value: db-svc3
+            - name: DB_NAME
+              value: comprobantes_db
+# Sin Service: nadie le habla por red, solo consume de RabbitMQ
+# La idempotencia (ON CONFLICT DO NOTHING) permite 2 replicas sin folios duplicados

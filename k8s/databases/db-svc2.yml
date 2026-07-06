@@ -1,0 +1,56 @@
+# Base de datos EXCLUSIVA del Servicio 2 (antifraude / tarjetas)
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: db-svc2-data
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: db-svc2
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: db-svc2
+  template:
+    metadata:
+      labels:
+        app: db-svc2
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:15-alpine
+          env:
+            - name: POSTGRES_USER
+              value: postgres
+            - name: POSTGRES_PASSWORD
+              value: postgres
+            - name: POSTGRES_DB
+              value: antifraude_db
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          ports:
+            - containerPort: 5432
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: db-svc2-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: db-svc2
+spec:
+  selector:
+    app: db-svc2
+  ports:
+    - port: 5432
