@@ -1,0 +1,19 @@
+# Ruteo por nombre de dominio para PROD
+# Aplicar SOLO en el namespace grupo3-prod:
+#   kubectl apply -f k8s/ingress-prod.yml -n grupo3-prod
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: gateway-ingress
+spec:
+  rules:
+    - host: prod.grupo3.uta.cl
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: api-gateway
+                port:
+                  number: 80

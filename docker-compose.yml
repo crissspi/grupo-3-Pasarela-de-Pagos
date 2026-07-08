@@ -59,11 +59,25 @@ services:
     build: ./servicio-2-validador
     container_name: app_antifraude
     environment:
-      - DB_HOST=db_antifraude    
+      - DB_HOST=db_antifraude
       - DB_USER=admin_fraude
       - DB_PASSWORD=password_seguro
       - DB_NAME=antifraude_db
       - RABBITMQ_URL=amqp://rabbitmq
     depends_on:
-      - db-validador             
+      - db-validador
+      - rabbitmq
+
+  # Microservicio 3: Emisión de Comprobantes (Node.js)
+  servicio-3-comprobantes:
+    build: ./servicio-3-comprobantes
+    container_name: app_comprobantes
+    environment:
+      - DB_HOST=db-comprobantes
+      - DB_USER=user_comp
+      - DB_PASSWORD=password_comp
+      - DB_NAME=db_comprobantes
+      - RABBITMQ_URL=amqp://admin:admin123@rabbitmq
+    depends_on:
+      - db-comprobantes
       - rabbitmq

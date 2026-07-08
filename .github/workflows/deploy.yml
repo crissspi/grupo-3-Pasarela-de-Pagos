@@ -31,11 +31,17 @@ jobs:
 
       - name: 4. Compilar y Subir Imágenes
         run: |
+          # Compilando el Procesador de Transacciones (Servicio 1)
+          docker build -t ${{ secrets.DOCKER_USER }}/procesador-transacciones:latest ./servicio-1-procesador
+          docker push ${{ secrets.DOCKER_USER }}/procesador-transacciones:latest
+
           # Compilando el Validador Antifraude (Servicio 2)
           docker build -t ${{ secrets.DOCKER_USER }}/validador-antifraude:latest ./servicio-2-validador
           docker push ${{ secrets.DOCKER_USER }}/validador-antifraude:latest
-          
-          # Nota para Pablo: Aquí debes agregar los comandos para el Servicio 1 y 3
+
+          # Compilando la Emisión de Comprobantes (Servicio 3)
+          docker build -t ${{ secrets.DOCKER_USER }}/emision-comprobantes:latest ./servicio-3-comprobantes
+          docker push ${{ secrets.DOCKER_USER }}/emision-comprobantes:latest
 
       - name: 5. Desplegar en la Máquina Virtual de la Universidad
         uses: appleboy/ssh-action@v0.1.10

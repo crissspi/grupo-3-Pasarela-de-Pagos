@@ -1,0 +1,57 @@
+# Base de datos EXCLUSIVA del Servicio 1 (transacciones)
+# PVC: los datos viven fuera del pod -> sobreviven a caidas y reinicios
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: db-svc1-data
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: db-svc1
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: db-svc1
+  template:
+    metadata:
+      labels:
+        app: db-svc1
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:15-alpine
+          env:
+            - name: POSTGRES_USER
+              value: postgres
+            - name: POSTGRES_PASSWORD
+              value: postgres
+            - name: POSTGRES_DB
+              value: transacciones_db
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          ports:
+            - containerPort: 5432
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: db-svc1-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: db-svc1   # solo el Servicio 1 conoce este host
+spec:
+  selector:
+    app: db-svc1
+  ports:
+    - port: 5432

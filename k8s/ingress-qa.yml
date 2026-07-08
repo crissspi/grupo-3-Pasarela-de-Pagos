@@ -1,0 +1,19 @@
+# Ruteo por nombre de dominio para QA (Traefik viene integrado en K3s)
+# Aplicar SOLO en el namespace grupo3-qa:
+#   kubectl apply -f k8s/ingress-qa.yml -n grupo3-qa
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: gateway-ingress
+spec:
+  rules:
+    - host: qa.grupo3.uta.cl
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: api-gateway
+                port:
+                  number: 80

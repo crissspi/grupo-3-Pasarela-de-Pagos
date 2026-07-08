@@ -1,0 +1,14 @@
+{
+  "name": "servicio-3-comprobantes",
+  "version": "1.0.0",
+  "description": "Emisión de Comprobantes - Event Driven",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "amqplib": "^0.10.4",
+    "pg": "^8.11.3",
+    "uuid": "^9.0.0"
+  }
+}
