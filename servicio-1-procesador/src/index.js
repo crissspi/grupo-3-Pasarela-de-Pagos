@@ -98,13 +98,13 @@ app.get('/transacciones', async (req, res) => {
 });
 
 app.post('/transacciones', async (req, res) => {
-  const { numero_tarjeta, cvc, monto } = req.body;
+  const { tarjeta_numero, cvc, monto } = req.body;
 
-  if (!numero_tarjeta || !cvc || !monto) {
+  if (!tarjeta_numero || !cvc || !monto) {
     return res.status(400).json({ error: 'Faltan datos obligatorios' });
   }
 
-  if (!/^[0-9]{12}$/.test(numero_tarjeta)) {
+  if (!/^[0-9]{12}$/.test(tarjeta_numero)) {
     return res.status(400).json({ error: 'La tarjeta debe tener 12 dígitos' });
   }
 
@@ -134,12 +134,10 @@ app.post('/transacciones', async (req, res) => {
     datos_pago: {
       monto,
       moneda: 'CLP',
-      tarjeta_numero: numero_tarjeta,
+      tarjeta_numero,
       cvc
     }
   };
-
-  console.log('Publicando evento transaccion_iniciada:', evento);
 
   channel.publish(
     'pagos',
