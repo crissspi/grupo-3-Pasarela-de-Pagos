@@ -56,14 +56,14 @@ services:
 
   # Microservicio 2: Lógica de Validador Antifraude (Node.js)
   servicio-2-validador:
-    build: ./servicio-2-validador  
+    build: ./servicio-2-validador
     container_name: app_antifraude
     environment:
-      - DB_HOST=db-validador      
+      - DB_HOST=db_antifraude    
       - DB_USER=admin_fraude
       - DB_PASSWORD=password_seguro
       - DB_NAME=antifraude_db
       - RABBITMQ_URL=amqp://rabbitmq
     depends_on:
-      - db-validador
+      - db-validador             
       - rabbitmq
