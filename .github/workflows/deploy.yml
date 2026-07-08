@@ -1,0 +1,53 @@
+name: Deploy Automático a Servidores
+
+on:
+  push:
+    branches:
+      - develop
+      - main
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 1. Descargar el código del repositorio
+        uses: actions/checkout@v3
+
+      - name: 2. Configurar el Entorno (QA o PROD)
+        id: entorno
+        run: |
+          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            echo "ESPACIO=grupo3-prod" >> $GITHUB_ENV
+          else
+            echo "ESPACIO=grupo3-qa" >> $GITHUB_ENV
+          fi
+
+      - name: 3. Iniciar sesión en Docker Hub (Registro Público)
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USER }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: 4. Compilar y Subir Imágenes
+        run: |
+          # Compilando el Validador Antifraude (Servicio 2)
+          docker build -t ${{ secrets.DOCKER_USER }}/validador-antifraude:latest ./servicio-2-validador
+          docker push ${{ secrets.DOCKER_USER }}/validador-antifraude:latest
+          
+          # Nota para Pablo: Aquí debes agregar los comandos para el Servicio 1 y 3
+
+      - name: 5. Desplegar en la Máquina Virtual de la Universidad
+        uses: appleboy/ssh-action@v0.1.10
+        with:
+          host: ${{ secrets.VM_IP }}
+          username: ${{ secrets.VM_USER }}
+          password: ${{ secrets.VM_PASSWORD }}
+          script: |
+            echo "Iniciando despliegue automático en el espacio: ${{ env.ESPACIO }}"
+            cd ~/grupo-3-Pasarela-de-Pagos
+            git pull origin ${{ github.ref_name }}
+            
+            # Recarga la infraestructura con las imágenes frescas
+            sudo docker-compose pull
+            sudo docker-compose up -d

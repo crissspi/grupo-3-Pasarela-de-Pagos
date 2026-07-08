@@ -2,22 +2,37 @@ const amqp = require('amqplib');
 const { Client } = require('pg');
 
 const dbClient = new Client({
-    host: process.env.DB_HOST,
-    user: process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
-    database: process.env.DB_NAME,
-    port: 5432,
+  host: process.env.DB_HOST,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME,
 });
 
-async function iniciarServicio2() {
-    await dbClient.connect();
-    console.log("Servicio 2 conectado a su base de datos aislada (Antifraude)");
+const connectDBWithRetry = async () => {
+  while (true) {
+    try {
+      await dbClient.connect();
+      console.log('Servicio 2 conectado a su base de datos aislada (Antifraude)');
+      break; 
+    } catch (error) {
+      console.error('Base de datos no disponible. Reintentando en 5 segundos...');
+      await new Promise(resolve => setTimeout(resolve, 5000));
+    }
+  }
+};
 
-    const connection = await amqp.connect(process.env.RABBITMQ_URL || 'amqp://rabbitmq_host');
+async function iniciarServicio2() {
+    await connectDBWithRetry();
+
+    // Conexión a RabbitMQ
+    const connection = await amqp.connect(process.env.RABBITMQ_URL || 'amqp://admin:admin123@rabbitmq');
     const channel = await connection.createChannel();
     
     const colaEntrada = 'transacciones_iniciadas';
+    const colaSalida = 'pagos_autorizados';
+    
     await channel.assertQueue(colaEntrada);
+    await channel.assertQueue(colaSalida);
     
     console.log("Validador Antifraude esperando transacciones...");
 
@@ -25,41 +40,44 @@ async function iniciarServicio2() {
         if (mensaje !== null) {
             const transaccion = JSON.parse(mensaje.content.toString());
             
-            const tarjetaValida = transaccion.tarjeta && transaccion.tarjeta.length === 12;
-            const cvcValido = transaccion.cvc && transaccion.cvc.length >= 3;
+            const idTx = transaccion.id_transaccion;
+            const tarjeta = transaccion.datos_pago.tarjeta_numero;
+            const cvc = transaccion.datos_pago.cvc;
+            const monto = transaccion.datos_pago.monto;
             
+            const tarjetaValida = tarjeta && tarjeta.length === 12;
+            const cvcValido = cvc && cvc.length >= 3;
             let tieneFondos = false;
 
             try {
                 const res = await dbClient.query(
                     'SELECT saldo FROM tarjetas WHERE numero = $1', 
-                    [transaccion.tarjeta]
+                    [tarjeta]
                 );
 
                 if (res.rows.length > 0) {
                     const saldoDisponible = res.rows[0].saldo;
-                    if (saldoDisponible >= transaccion.monto) {
+                    if (saldoDisponible >= monto) {
                         tieneFondos = true;
-                        await dbClient.query('UPDATE tarjetas SET saldo = saldo - $1 WHERE numero = $2', [transaccion.monto, transaccion.tarjeta]);
+                        await dbClient.query('UPDATE tarjetas SET saldo = saldo - $1 WHERE numero = $2', [monto, tarjeta]);
                     }
                 }
             } catch (dbError) {
-                console.error("❌ Error consultando a la BD Antifraude:", dbError);
+                console.error(`Error consultando a la BD Antifraude para Tx ${idTx}:`, dbError);
             }
             
             if (tarjetaValida && cvcValido && tieneFondos) {
                 const eventoAprobado = {
-                    id_transaccion: transaccion.id,
-                    estado: 'pago_autorizado'
+                    id_transaccion: idTx,
+                    estado_validacion: "aprobado",
+                    motivo: "Fondos suficientes y validación de seguridad exitosa",
+                    monto_validado: monto
                 };
                 
-                const colaSalida = 'pagos_autorizados';
-                await channel.assertQueue(colaSalida);
                 channel.sendToQueue(colaSalida, Buffer.from(JSON.stringify(eventoAprobado)));
-                
-                console.log(`✅ Transacción ${transaccion.id} aprobada y evento publicado.`);
+                console.log(`Transacción ${idTx} aprobada y evento publicado.`);
             } else {
-                console.log(`⚠️ Transacción ${transaccion.id} rechazada (Datos inválidos o sin fondos).`);
+                console.log(`Transacción ${idTx} rechazada (Datos inválidos o sin fondos).`);
             }
             
             channel.ack(mensaje);
