@@ -1,0 +1,80 @@
+# CI/CD hacia QA: cada push a develop construye las imagenes,
+# las publica en GHCR y despliega en el namespace grupo3-qa del cluster K3s.
+name: Deploy QA
+
+on:
+  push:
+    branches: [develop]
+
+env:
+  REGISTRY: ghcr.io/crissspi/grupo-3-pasarela-de-pagos
+
+jobs:
+  # ── CI: construir y publicar las 5 imagenes en el registro publico ──
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        component:
+          - servicio-1-procesador
+          - servicio-2-validador
+          - servicio-3-comprobantes
+          - api-gateway
+          - frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Login a GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build y push de la imagen
+        uses: docker/build-push-action@v6
+        with:
+          context: ./${{ matrix.component }}
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ matrix.component }}:latest
+            ${{ env.REGISTRY }}/${{ matrix.component }}:${{ github.sha }}
+
+  # ── CD: aplicar manifiestos y reiniciar deployments en la VM ──
+  deploy-qa:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Copiar manifiestos a la VM
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          password: ${{ secrets.VM_PASSWORD }}
+          source: "k8s/*"
+          target: "~/deploy-qa/"
+
+      - name: Desplegar en grupo3-qa
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          password: ${{ secrets.VM_PASSWORD }}
+          script: |
+            cd ~/deploy-qa
+            kubectl apply -f k8s/namespaces.yml
+            kubectl apply -f k8s/databases/ -n grupo3-qa
+            kubectl apply -f k8s/rabbitmq.yml -n grupo3-qa
+            kubectl apply -f k8s/servicio-1.yml -f k8s/servicio-2.yml -f k8s/servicio-3.yml -n grupo3-qa
+            kubectl apply -f k8s/frontend.yml -f k8s/gateway.yml -n grupo3-qa
+            kubectl apply -f k8s/ingress-qa.yml -n grupo3-qa
+            kubectl apply -f k8s/backup-cronjob.yml -n grupo3-qa
+            # forzar que los pods tomen la imagen :latest recien publicada
+            kubectl rollout restart deployment servicio-1-procesador servicio-2-validador servicio-3-comprobantes api-gateway frontend -n grupo3-qa
+            kubectl rollout status deployment/servicio-1-procesador -n grupo3-qa --timeout=180s
+            kubectl get pods -n grupo3-qa
