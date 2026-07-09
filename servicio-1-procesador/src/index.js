@@ -60,6 +60,13 @@ async function iniciarRabbitMQ() {
     'comprobante_emitido'
   );
 
+  // La misma cola tambien recibe los rechazos del Validador Antifraude
+  await channel.bindQueue(
+    'transacciones.finalizar',
+    'pagos',
+    'transaccion_rechazada'
+  );
+
   channel.consume('transacciones.finalizar', async (msg) => {
     const evento = JSON.parse(msg.content.toString());
     console.log('Transacciones recibió evento final:', evento);

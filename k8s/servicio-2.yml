@@ -16,12 +16,17 @@ spec:
     spec:
       containers:
         - name: servicio-2
-          image: ghcr.io/crissspi/grupo-3-pasarela-de-pagos/servicio-2-validador:latest
+          image: DOCKERHUB_USER/validador-antifraude:latest
+          imagePullPolicy: Always
           env:
             - name: RABBITMQ_URL
-              value: amqp://rabbitmq
+              value: amqp://admin:admin123@rabbitmq
             - name: DB_HOST
               value: db-svc2
+            - name: DB_USER
+              value: postgres
+            - name: DB_PASSWORD
+              value: postgres
             - name: DB_NAME
               value: antifraude_db
 # Sin Service: nadie le habla por red, solo consume de RabbitMQ

@@ -1,21 +1,24 @@
 const amqp = require('amqplib');
 const { Client } = require('pg');
 
-const dbClient = new Client({
-  host: process.env.DB_HOST,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME,
-});
+let dbClient;
 
 const connectDBWithRetry = async () => {
   while (true) {
+    // Un Client de pg que fallo al conectar queda inutilizable:
+    // hay que crear uno nuevo en cada intento
+    dbClient = new Client({
+      host: process.env.DB_HOST,
+      user: process.env.DB_USER,
+      password: process.env.DB_PASSWORD,
+      database: process.env.DB_NAME,
+    });
     try {
       await dbClient.connect();
       console.log('Servicio 2 conectado a su base de datos aislada (Antifraude)');
-      break; 
+      break;
     } catch (error) {
-      console.error('Base de datos no disponible. Reintentando en 5 segundos...');
+      console.error(`Base de datos no disponible (${error.message}). Reintentando en 5 segundos...`);
       await new Promise(resolve => setTimeout(resolve, 5000));
     }
   }
@@ -33,7 +36,12 @@ async function iniciarServicio2() {
     
     await channel.assertQueue(colaEntrada);
     await channel.assertQueue(colaSalida);
-    
+
+    // El Servicio 1 publica al exchange "pagos" con routing key "transaccion_iniciada".
+    // Sin este binding la cola queda huerfana y los mensajes se pierden.
+    await channel.assertExchange('pagos', 'topic', { durable: true });
+    await channel.bindQueue(colaEntrada, 'pagos', 'transaccion_iniciada');
+
     console.log("Validador Antifraude esperando transacciones...");
 
     channel.consume(colaEntrada, async (mensaje) => {
@@ -77,6 +85,15 @@ async function iniciarServicio2() {
                 channel.sendToQueue(colaSalida, Buffer.from(JSON.stringify(eventoAprobado)));
                 console.log(`Transacción ${idTx} aprobada y evento publicado.`);
             } else {
+                // Notifica el rechazo al Servicio 1 para que la transaccion
+                // no quede EN_PROCESO para siempre
+                const eventoRechazado = {
+                    id_transaccion: idTx,
+                    estado_final: "rechazado",
+                    folio_contable: null,
+                    mensaje: "Datos inválidos o fondos insuficientes"
+                };
+                channel.publish('pagos', 'transaccion_rechazada', Buffer.from(JSON.stringify(eventoRechazado)), { persistent: true });
                 console.log(`Transacción ${idTx} rechazada (Datos inválidos o sin fondos).`);
             }
             

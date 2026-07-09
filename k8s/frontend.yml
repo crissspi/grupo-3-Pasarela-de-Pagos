@@ -15,7 +15,8 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: ghcr.io/crissspi/grupo-3-pasarela-de-pagos/frontend:latest
+          image: DOCKERHUB_USER/frontend-pagos:latest
+          imagePullPolicy: Always
           ports:
             - containerPort: 80
 ---

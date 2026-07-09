@@ -43,17 +43,57 @@ jobs:
           docker build -t ${{ secrets.DOCKER_USER }}/emision-comprobantes:latest ./servicio-3-comprobantes
           docker push ${{ secrets.DOCKER_USER }}/emision-comprobantes:latest
 
-      - name: 5. Desplegar en la Máquina Virtual de la Universidad
+          # Compilando el API Gateway
+          docker build -t ${{ secrets.DOCKER_USER }}/api-gateway-pagos:latest ./api-gateway
+          docker push ${{ secrets.DOCKER_USER }}/api-gateway-pagos:latest
+
+          # Compilando el Frontend
+          docker build -t ${{ secrets.DOCKER_USER }}/frontend-pagos:latest ./frontend
+          docker push ${{ secrets.DOCKER_USER }}/frontend-pagos:latest
+
+      - name: 5. Desplegar en el cluster K3s de la Universidad
         uses: appleboy/ssh-action@v0.1.10
         with:
           host: ${{ secrets.VM_IP }}
           username: ${{ secrets.VM_USER }}
           password: ${{ secrets.VM_PASSWORD }}
           script: |
-            echo "Iniciando despliegue automático en el espacio: ${{ env.ESPACIO }}"
+            echo "Desplegando en el namespace: ${{ env.ESPACIO }}"
+
+            # Asegura que el repo exista y este actualizado en la VM
+            if [ ! -d ~/grupo-3-Pasarela-de-Pagos ]; then
+              git clone https://github.com/crissspi/grupo-3-Pasarela-de-Pagos.git ~/grupo-3-Pasarela-de-Pagos
+            fi
             cd ~/grupo-3-Pasarela-de-Pagos
-            git pull origin ${{ github.ref_name }}
-            
-            # Recarga la infraestructura con las imágenes frescas
-            sudo docker-compose pull
-            sudo docker-compose up -d
+            git fetch origin
+            git checkout ${{ github.ref_name }}
+            git reset --hard origin/${{ github.ref_name }}
+
+            # Copia de trabajo de los manifiestos con el usuario real de Docker Hub
+            rm -rf /tmp/k8s-deploy
+            cp -r k8s /tmp/k8s-deploy
+            find /tmp/k8s-deploy -name '*.yml' -exec sed -i "s|DOCKERHUB_USER|${{ secrets.DOCKER_USER }}|g" {} +
+
+            # kubectl del K3s (kubeconfig del usuario, configurado una vez en la VM)
+            export KUBECONFIG=$HOME/.kube/config
+
+            k3s kubectl apply -f /tmp/k8s-deploy/namespaces.yml
+            k3s kubectl apply -n ${{ env.ESPACIO }} -f /tmp/k8s-deploy/databases/
+            k3s kubectl apply -n ${{ env.ESPACIO }} -f /tmp/k8s-deploy/rabbitmq.yml
+            k3s kubectl apply -n ${{ env.ESPACIO }} \
+              -f /tmp/k8s-deploy/servicio-1.yml \
+              -f /tmp/k8s-deploy/servicio-2.yml \
+              -f /tmp/k8s-deploy/servicio-3.yml \
+              -f /tmp/k8s-deploy/gateway.yml \
+              -f /tmp/k8s-deploy/frontend.yml \
+              -f /tmp/k8s-deploy/backup-cronjob.yml
+
+            if [ "${{ env.ESPACIO }}" = "grupo3-prod" ]; then
+              k3s kubectl apply -n grupo3-prod -f /tmp/k8s-deploy/ingress-prod.yml
+            else
+              k3s kubectl apply -n grupo3-qa -f /tmp/k8s-deploy/ingress-qa.yml
+            fi
+
+            # Fuerza a los pods a bajar las imagenes :latest recien publicadas
+            k3s kubectl rollout restart deployment -n ${{ env.ESPACIO }}
+            k3s kubectl get pods -n ${{ env.ESPACIO }}

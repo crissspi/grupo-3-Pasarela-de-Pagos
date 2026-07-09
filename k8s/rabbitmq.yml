@@ -27,6 +27,13 @@ spec:
       containers:
         - name: rabbitmq
           image: rabbitmq:3-management-alpine
+          # Sin esto solo existiria el usuario "guest", que RabbitMQ
+          # bloquea para conexiones remotas (otros pods)
+          env:
+            - name: RABBITMQ_DEFAULT_USER
+              value: admin
+            - name: RABBITMQ_DEFAULT_PASS
+              value: admin123
           ports:
             - containerPort: 5672   # AMQP (mensajes)
             - containerPort: 15672  # panel de administracion

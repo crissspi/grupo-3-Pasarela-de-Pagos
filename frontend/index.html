@@ -1,10 +1,47 @@
-<!-- Formulario de pago -->
-<form id="pago-form">
-  <input id="monto" placeholder="Monto" />
-  <input id="tarjeta" placeholder="Número tarjeta (12 dígitos)" />
-  <input id="cvc" placeholder="CVC" />
-  <button type="submit">Pagar</button>
-</form>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pasarela de Pagos - Grupo 3</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 720px; margin: 40px auto; padding: 0 16px; background: #f5f6fa; color: #2d3436; }
+    h1 { font-size: 1.4rem; }
+    form { background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,.1); display: grid; gap: 10px; }
+    input { padding: 10px; border: 1px solid #dfe6e9; border-radius: 6px; font-size: 1rem; }
+    button { padding: 12px; background: #0984e3; color: #fff; border: none; border-radius: 6px; font-size: 1rem; cursor: pointer; }
+    button:hover { background: #0868b3; }
+    #mensaje { margin: 12px 0; padding: 10px; border-radius: 6px; display: none; }
+    #mensaje.ok { display: block; background: #d4f5e2; color: #1b7a43; }
+    #mensaje.error { display: block; background: #ffe0e0; color: #b33; }
+    table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,.1); }
+    th, td { padding: 10px; text-align: left; border-bottom: 1px solid #f0f0f0; font-size: .9rem; }
+    th { background: #2d3436; color: #fff; }
+    .estado-COMPLETADO { color: #1b7a43; font-weight: bold; }
+    .estado-EN_PROCESO { color: #b8860b; font-weight: bold; }
+    .estado-RECHAZADO { color: #b33; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <h1>💳 Pasarela de Pagos — Grupo 3</h1>
 
-<!-- Historial -->
-<div id="historial"></div>
+  <form id="pago-form">
+    <input id="tarjeta" placeholder="Número de tarjeta (12 dígitos)" maxlength="12" required />
+    <input id="cvc" placeholder="CVC (3 dígitos)" maxlength="3" required />
+    <input id="monto" type="number" placeholder="Monto (CLP)" min="1" required />
+    <button type="submit">Pagar</button>
+  </form>
+
+  <div id="mensaje"></div>
+
+  <h2>Historial de transacciones</h2>
+  <table>
+    <thead>
+      <tr><th>ID</th><th>Monto</th><th>Estado</th><th>Folio contable</th></tr>
+    </thead>
+    <tbody id="historial"></tbody>
+  </table>
+
+  <script src="app.js"></script>
+</body>
+</html>
