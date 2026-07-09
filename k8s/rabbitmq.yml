@@ -45,6 +45,9 @@ spec:
               command: ["rabbitmq-diagnostics", "ping"]
             initialDelaySeconds: 15
             periodSeconds: 10
+            # el CLI de Erlang tarda varios segundos en las VMs de la U;
+            # con el timeout por defecto (1s) el probe fallaba siempre
+            timeoutSeconds: 10
       volumes:
         - name: data
           persistentVolumeClaim:
