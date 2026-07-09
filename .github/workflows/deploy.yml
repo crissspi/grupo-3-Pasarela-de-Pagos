@@ -51,7 +51,13 @@ jobs:
           docker build -t ${{ secrets.DOCKER_USER }}/frontend-pagos:latest ./frontend
           docker push ${{ secrets.DOCKER_USER }}/frontend-pagos:latest
 
+      # NOTA: el firewall de la universidad bloquea SSH entrante desde los
+      # runners de GitHub (Azure), por lo que este paso falla con timeout
+      # cuando corre desde la nube. El despliegue real lo hace el agente
+      # pull-based en la VM (scripts/deploy-agent.sh, via cron cada 1 min),
+      # que detecta los commits nuevos y aplica los manifiestos con kubectl.
       - name: 5. Desplegar en el cluster K3s de la Universidad
+        continue-on-error: true
         uses: appleboy/ssh-action@v0.1.10
         with:
           host: ${{ secrets.VM_IP }}
