@@ -51,23 +51,9 @@ async function conectarRabbitMQ() {
 async function iniciarRabbitMQ() {
   channel = await conectarRabbitMQ();
 
-  await channel.assertExchange('pagos', 'topic', { durable: true });
-  await channel.assertQueue('transacciones.finalizar', { durable: true });
+  await channel.assertQueue('comprobante_emitido', { durable: true });
 
-  await channel.bindQueue(
-    'transacciones.finalizar',
-    'pagos',
-    'comprobante_emitido'
-  );
-
-  // La misma cola tambien recibe los rechazos del Validador Antifraude
-  await channel.bindQueue(
-    'transacciones.finalizar',
-    'pagos',
-    'transaccion_rechazada'
-  );
-
-  channel.consume('transacciones.finalizar', async (msg) => {
+  channel.consume('comprobante_emitido', async (msg) => {
     const evento = JSON.parse(msg.content.toString());
     console.log('Transacciones recibió evento final:', evento);
 
@@ -147,7 +133,6 @@ app.post('/transacciones', async (req, res) => {
   };
 
   channel.publish(
-    'pagos',
     'transaccion_iniciada',
     Buffer.from(JSON.stringify(evento)),
     { persistent: true }

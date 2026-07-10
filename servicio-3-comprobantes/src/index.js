@@ -11,9 +11,8 @@ const { v4: uuidv4 } = require('uuid');
 
 const RABBITMQ_URL = process.env.RABBITMQ_URL || 'amqp://admin:admin123@rabbitmq';
 
-const QUEUE_IN = 'pagos_autorizados';
-const EXCHANGE_OUT = 'pagos';
-const ROUTING_KEY_OUT = 'comprobante_emitido';
+const QUEUE_IN = 'pago_autorizado';
+const QUEUE_OUT = 'comprobante_emitido';
 
 const db = new Pool({
   host: process.env.DB_HOST || 'db-svc3',
@@ -63,11 +62,8 @@ async function main() {
   await initDB();
   const channel = await connectRabbit();
 
-  // OJO: sin durable, para calzar con la declaración que hace el Servicio 2
-  // (assertQueue con parámetros distintos a los de la cola existente da PRECONDITION_FAILED)
-  await channel.assertQueue(QUEUE_IN);
-  // Exchange topic "pagos": el mismo que declara el Servicio 1
-  await channel.assertExchange(EXCHANGE_OUT, 'topic', { durable: true });
+  await channel.assertQueue(QUEUE_IN, { durable: true });
+  await channel.assertQueue(QUEUE_OUT, { durable: true });
 
   console.log(`[Svc3] Escuchando cola: ${QUEUE_IN}`);
 
@@ -94,7 +90,7 @@ async function main() {
       mensaje: 'Comprobante emitido y proceso finalizado',
       timestamp: new Date().toISOString()
     };
-    channel.publish(EXCHANGE_OUT, ROUTING_KEY_OUT, Buffer.from(JSON.stringify(evento)), { persistent: true });
+    channel.sendToQueue(QUEUE_OUT, Buffer.from(JSON.stringify(evento)), { persistent: true });
     channel.ack(msg);
     console.log(`[Svc3] Comprobante emitido: ${folio} (tx ${data.id_transaccion})`);
   });

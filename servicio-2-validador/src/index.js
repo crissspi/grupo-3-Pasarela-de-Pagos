@@ -31,14 +31,9 @@ async function iniciarServicio2() {
     const connection = await amqp.connect(process.env.RABBITMQ_URL || 'amqp://admin:admin123@rabbitmq');
     const channel = await connection.createChannel();
     
-    const colaEntrada = 'transacciones_iniciadas';
-    const colaSalida = 'pagos_autorizados';
+    const colaEntrada = 'transaccion_iniciada';
+    const colaSalida = 'pago_autorizado';
     
-    await channel.assertQueue(colaEntrada);
-    await channel.assertQueue(colaSalida);
-
-    // El Servicio 1 publica al exchange "pagos" con routing key "transaccion_iniciada".
-    // Sin este binding la cola queda huerfana y los mensajes se pierden.
     await channel.assertExchange('pagos', 'topic', { durable: true });
     await channel.bindQueue(colaEntrada, 'pagos', 'transaccion_iniciada');
 
@@ -93,7 +88,7 @@ async function iniciarServicio2() {
                     folio_contable: null,
                     mensaje: "Datos inválidos o fondos insuficientes"
                 };
-                channel.publish('pagos', 'transaccion_rechazada', Buffer.from(JSON.stringify(eventoRechazado)), { persistent: true });
+                channel.sendToQueue('comprobante_emitido', Buffer.from(JSON.stringify(eventoRechazado)), { persistent: true });
                 console.log(`Transacción ${idTx} rechazada (Datos inválidos o sin fondos).`);
             }
             
