@@ -132,7 +132,7 @@ app.post('/transacciones', async (req, res) => {
     }
   };
 
-  channel.publish(
+  channel.sendToQueue(
     'transaccion_iniciada',
     Buffer.from(JSON.stringify(evento)),
     { persistent: true }
