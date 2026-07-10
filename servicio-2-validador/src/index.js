@@ -27,8 +27,17 @@ const connectDBWithRetry = async () => {
 async function iniciarServicio2() {
     await connectDBWithRetry();
 
-    // Conexión a RabbitMQ
-    const connection = await amqp.connect(process.env.RABBITMQ_URL || 'amqp://admin:admin123@rabbitmq');
+    // Conexión a RabbitMQ con reintentos: en arranque en frío (docker compose up)
+    // el broker puede tardar más que este servicio y sin esto el proceso quedaba muerto
+    let connection;
+    while (!connection) {
+        try {
+            connection = await amqp.connect(process.env.RABBITMQ_URL || 'amqp://admin:admin123@rabbitmq');
+        } catch (error) {
+            console.log(`RabbitMQ no disponible (${error.message}). Reintentando en 5 segundos...`);
+            await new Promise(resolve => setTimeout(resolve, 5000));
+        }
+    }
     const channel = await connection.createChannel();
     
     const colaEntrada = 'transaccion_iniciada';
