@@ -21,6 +21,17 @@ async function esperar(ms) {
 }
 
 async function iniciarBaseDatos() {
+  // Reintentos: en arranque en frio (docker compose up) Postgres puede
+  // tardar mas que este servicio en estar listo
+  for (let i = 1; i <= 10; i++) {
+    try {
+      await pool.query('SELECT 1');
+      break;
+    } catch {
+      console.log(`PostgreSQL no listo. Intento ${i}/10...`);
+      await esperar(5000);
+    }
+  }
   await pool.query(`
     CREATE TABLE IF NOT EXISTS transacciones (
       id SERIAL PRIMARY KEY,
