@@ -14,6 +14,14 @@ spec:
       labels:
         app: servicio-2-validador
     spec:
+      # Reparte las 2 replicas entre las 2 VMs (alta disponibilidad)
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: servicio-2-validador
       containers:
         - name: servicio-2
           image: DOCKERHUB_USER/validador-antifraude:latest

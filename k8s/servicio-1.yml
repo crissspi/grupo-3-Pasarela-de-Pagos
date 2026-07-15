@@ -14,6 +14,15 @@ spec:
       labels:
         app: servicio-1-procesador
     spec:
+      # Reparte las 2 replicas entre las 2 VMs: si una maquina cae,
+      # la replica de la otra sigue atendiendo (alta disponibilidad)
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: servicio-1-procesador
       containers:
         - name: servicio-1
           # La imagen la publica GitHub Actions en Docker Hub

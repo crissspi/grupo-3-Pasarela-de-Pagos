@@ -13,6 +13,14 @@ spec:
       labels:
         app: api-gateway
     spec:
+      # Reparte las 2 replicas entre las 2 VMs (alta disponibilidad)
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: api-gateway
       containers:
         - name: api-gateway
           image: DOCKERHUB_USER/api-gateway-pagos:latest

@@ -6,30 +6,29 @@ on:
       - develop
       - main
 
+# Evita dos despliegues simultáneos de la misma rama
+concurrency:
+  group: deploy-${{ github.ref }}
+
 jobs:
-  build-and-deploy:
+  # ================== CI: construir y publicar imágenes ==================
+  # Corre en un runner de GitHub (nube): compila las 5 imágenes y las
+  # publica en Docker Hub. Si esto falla, el deploy no se ejecuta (needs).
+  build:
+    name: CI - Construir y publicar imágenes
     runs-on: ubuntu-latest
 
     steps:
       - name: 1. Descargar el código del repositorio
         uses: actions/checkout@v3
 
-      - name: 2. Configurar el Entorno (QA o PROD)
-        id: entorno
-        run: |
-          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
-            echo "ESPACIO=grupo3-prod" >> $GITHUB_ENV
-          else
-            echo "ESPACIO=grupo3-qa" >> $GITHUB_ENV
-          fi
-
-      - name: 3. Iniciar sesión en Docker Hub (Registro Público)
+      - name: 2. Iniciar sesión en Docker Hub (Registro Público)
         uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKER_USER }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: 4. Compilar y Subir Imágenes
+      - name: 3. Compilar y Subir Imágenes
         run: |
           # Compilando el Procesador de Transacciones (Servicio 1)
           docker build -t ${{ secrets.DOCKER_USER }}/procesador-transacciones:latest ./servicio-1-procesador
@@ -51,55 +50,61 @@ jobs:
           docker build -t ${{ secrets.DOCKER_USER }}/frontend-pagos:latest ./frontend
           docker push ${{ secrets.DOCKER_USER }}/frontend-pagos:latest
 
-      # NOTA: el firewall de la universidad bloquea SSH entrante desde los
-      # runners de GitHub (Azure), por lo que este paso falla con timeout
-      # cuando corre desde la nube. El despliegue real lo hace el agente
-      # pull-based en la VM (scripts/deploy-agent.sh, via cron cada 1 min),
-      # que detecta los commits nuevos y aplica los manifiestos con kubectl.
-      - name: 5. Desplegar en el cluster K3s de la Universidad
-        continue-on-error: true
-        uses: appleboy/ssh-action@v0.1.10
-        with:
-          host: ${{ secrets.VM_IP }}
-          username: ${{ secrets.VM_USER }}
-          password: ${{ secrets.VM_PASSWORD }}
-          script: |
-            echo "Desplegando en el namespace: ${{ env.ESPACIO }}"
+  # ================== CD: desplegar al cluster K3s ==================
+  # El firewall de la universidad bloquea SSH ENTRANTE desde los runners
+  # de GitHub (Azure), así que el deploy no puede hacerse con ssh-action.
+  # Solución: un runner self-hosted instalado en la VM1. El runner abre
+  # una conexión SALIENTE hacia GitHub (eso el firewall sí lo permite),
+  # recibe este job y lo ejecuta localmente, donde kubectl sí tiene
+  # acceso directo al cluster K3s. Deploy 100% automatizado desde Actions.
+  deploy:
+    name: CD - Desplegar en el cluster K3s
+    needs: build
+    runs-on: self-hosted
 
-            # Asegura que el repo exista y este actualizado en la VM
-            if [ ! -d ~/grupo-3-Pasarela-de-Pagos ]; then
-              git clone https://github.com/crissspi/grupo-3-Pasarela-de-Pagos.git ~/grupo-3-Pasarela-de-Pagos
-            fi
-            cd ~/grupo-3-Pasarela-de-Pagos
-            git fetch origin
-            git checkout ${{ github.ref_name }}
-            git reset --hard origin/${{ github.ref_name }}
+    steps:
+      - name: 1. Descargar el código del repositorio
+        uses: actions/checkout@v3
 
-            # Copia de trabajo de los manifiestos con el usuario real de Docker Hub
-            rm -rf /tmp/k8s-deploy
-            cp -r k8s /tmp/k8s-deploy
-            find /tmp/k8s-deploy -name '*.yml' -exec sed -i "s|DOCKERHUB_USER|${{ secrets.DOCKER_USER }}|g" {} +
+      - name: 2. Aplicar manifiestos en el namespace correspondiente
+        run: |
+          # develop -> QA / main -> PROD
+          if [ "${GITHUB_REF_NAME}" = "main" ]; then
+            ESPACIO=grupo3-prod
+            INGRESS=ingress-prod.yml
+          else
+            ESPACIO=grupo3-qa
+            INGRESS=ingress-qa.yml
+          fi
+          echo "Desplegando en el namespace: $ESPACIO"
 
-            # kubectl del K3s (kubeconfig del usuario, configurado una vez en la VM)
-            export KUBECONFIG=$HOME/.kube/config
+          export KUBECONFIG=$HOME/.kube/config
+          export PATH=$PATH:/usr/local/bin
 
-            k3s kubectl apply -f /tmp/k8s-deploy/namespaces.yml
-            k3s kubectl apply -n ${{ env.ESPACIO }} -f /tmp/k8s-deploy/databases/
-            k3s kubectl apply -n ${{ env.ESPACIO }} -f /tmp/k8s-deploy/rabbitmq.yml
-            k3s kubectl apply -n ${{ env.ESPACIO }} \
-              -f /tmp/k8s-deploy/servicio-1.yml \
-              -f /tmp/k8s-deploy/servicio-2.yml \
-              -f /tmp/k8s-deploy/servicio-3.yml \
-              -f /tmp/k8s-deploy/gateway.yml \
-              -f /tmp/k8s-deploy/frontend.yml \
-              -f /tmp/k8s-deploy/backup-cronjob.yml
+          # Copia de trabajo de los manifiestos con el usuario real de Docker Hub
+          rm -rf /tmp/k8s-deploy
+          cp -r k8s /tmp/k8s-deploy
+          find /tmp/k8s-deploy -name '*.yml' -exec sed -i "s|DOCKERHUB_USER|${{ secrets.DOCKER_USER }}|g" {} +
 
-            if [ "${{ env.ESPACIO }}" = "grupo3-prod" ]; then
-              k3s kubectl apply -n grupo3-prod -f /tmp/k8s-deploy/ingress-prod.yml
-            else
-              k3s kubectl apply -n grupo3-qa -f /tmp/k8s-deploy/ingress-qa.yml
-            fi
+          k3s kubectl apply -f /tmp/k8s-deploy/namespaces.yml
+          k3s kubectl apply -n $ESPACIO \
+            -f /tmp/k8s-deploy/databases/ \
+            -f /tmp/k8s-deploy/rabbitmq.yml \
+            -f /tmp/k8s-deploy/servicio-1.yml \
+            -f /tmp/k8s-deploy/servicio-2.yml \
+            -f /tmp/k8s-deploy/servicio-3.yml \
+            -f /tmp/k8s-deploy/gateway.yml \
+            -f /tmp/k8s-deploy/frontend.yml \
+            -f /tmp/k8s-deploy/backup-cronjob.yml \
+            -f /tmp/k8s-deploy/$INGRESS
 
-            # Fuerza a los pods a bajar las imagenes :latest recien publicadas
-            k3s kubectl rollout restart deployment -n ${{ env.ESPACIO }}
-            k3s kubectl get pods -n ${{ env.ESPACIO }}
+          # Fuerza a los pods a bajar las imágenes :latest recién publicadas
+          k3s kubectl rollout restart deployment -n $ESPACIO
+
+      - name: 3. Verificar el estado de los pods
+        run: |
+          export KUBECONFIG=$HOME/.kube/config
+          export PATH=$PATH:/usr/local/bin
+          if [ "${GITHUB_REF_NAME}" = "main" ]; then ESPACIO=grupo3-prod; else ESPACIO=grupo3-qa; fi
+          sleep 15
+          k3s kubectl get pods -n $ESPACIO -o wide

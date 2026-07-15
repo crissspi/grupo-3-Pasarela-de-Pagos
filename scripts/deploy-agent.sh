@@ -1,10 +1,16 @@
 #!/bin/bash
 # ============================================================
-# Agente de despliegue continuo (corre en la VM 1 via cron)
+# [OBSOLETO] Agente de despliegue continuo (corria en la VM 1 via cron)
+#
+# Reemplazado por un runner self-hosted de GitHub Actions en la VM1:
+# ahora el job "deploy" del workflow ejecuta kubectl directamente en
+# la maquina, sin cron ni git fetch. Este script queda solo como
+# respaldo por si el runner deja de funcionar.
+# Para quitarlo del cron:  crontab -l | grep -v deploy-agent | crontab -
 #
 # La universidad bloquea SSH entrante desde los runners de
-# GitHub Actions, asi que el deploy no puede ser "push".
-# Este agente hace el CD estilo GitOps (pull-based):
+# GitHub Actions, asi que el deploy no podia ser "push" via SSH.
+# Este agente hacia el CD estilo GitOps (pull-based):
 #   - GitHub Actions construye y publica las imagenes (CI)
 #   - Cada minuto este script revisa si hay commits nuevos:
 #       develop -> despliega al namespace grupo3-qa
