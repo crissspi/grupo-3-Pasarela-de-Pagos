@@ -3,6 +3,7 @@ import cors from 'cors';
 import morgan from 'morgan';
 import pg from 'pg';
 import amqp from 'amqplib';
+import { randomUUID } from 'node:crypto';
 
 const { Pool } = pg;
 const app = express();
@@ -118,42 +119,51 @@ app.post('/transacciones', async (req, res) => {
 
   const fechaHora = new Date().toISOString();
 
-  const insert = await pool.query(
-    `INSERT INTO transacciones(id_transaccion, monto, moneda, estado)
-     VALUES($1, $2, $3, $4)
-     RETURNING id`,
-    [`temp-${Date.now()}`, monto, 'CLP', 'EN_PROCESO']
-  );
+  // try/catch: un error de UN pago responde 500 a ese cliente,
+  // nunca tumba el proceso (y con el a todos los requests en vuelo)
+  try {
+    // UUID en vez de Date.now(): dos pagos en el mismo milisegundo
+    // generaban el mismo id temporal y violaban la clave unica
+    const insert = await pool.query(
+      `INSERT INTO transacciones(id_transaccion, monto, moneda, estado)
+       VALUES($1, $2, $3, $4)
+       RETURNING id`,
+      [`temp-${randomUUID()}`, monto, 'CLP', 'EN_PROCESO']
+    );
 
-  const idTransaccion = `tx-${String(insert.rows[0].id).padStart(6, '0')}`;
+    const idTransaccion = `tx-${String(insert.rows[0].id).padStart(6, '0')}`;
 
-  await pool.query(
-    `UPDATE transacciones SET id_transaccion = $1 WHERE id = $2`,
-    [idTransaccion, insert.rows[0].id]
-  );
+    await pool.query(
+      `UPDATE transacciones SET id_transaccion = $1 WHERE id = $2`,
+      [idTransaccion, insert.rows[0].id]
+    );
 
-  const evento = {
-    id_transaccion: idTransaccion,
-    fecha_hora: fechaHora,
-    datos_pago: {
-      monto,
-      moneda: 'CLP',
-      tarjeta_numero,
-      cvc
-    }
-  };
+    const evento = {
+      id_transaccion: idTransaccion,
+      fecha_hora: fechaHora,
+      datos_pago: {
+        monto,
+        moneda: 'CLP',
+        tarjeta_numero,
+        cvc
+      }
+    };
 
-  channel.sendToQueue(
-    'transaccion_iniciada',
-    Buffer.from(JSON.stringify(evento)),
-    { persistent: true }
-  );
+    channel.sendToQueue(
+      'transaccion_iniciada',
+      Buffer.from(JSON.stringify(evento)),
+      { persistent: true }
+    );
 
-  res.status(202).json({
-    mensaje: 'Pago recibido correctamente. Estado: EN_PROCESO',
-    id_transaccion: idTransaccion,
-    estado: 'EN_PROCESO'
-  });
+    res.status(202).json({
+      mensaje: 'Pago recibido correctamente. Estado: EN_PROCESO',
+      id_transaccion: idTransaccion,
+      estado: 'EN_PROCESO'
+    });
+  } catch (error) {
+    console.error('Error procesando pago:', error);
+    res.status(500).json({ error: 'Error interno procesando el pago' });
+  }
 });
 
 async function main() {
