@@ -44,6 +44,10 @@ async function iniciarServicio2() {
     const colaSalida = 'pago_autorizado';
     
     await channel.assertExchange('pagos', 'topic', { durable: true });
+    // Declarar las colas antes de usarlas: en un RabbitMQ recien creado no
+    // existen y bindQueue/consume fallan con 404 (visto en el primer deploy a prod)
+    await channel.assertQueue(colaEntrada, { durable: true });
+    await channel.assertQueue(colaSalida, { durable: true });
     await channel.bindQueue(colaEntrada, 'pagos', 'transaccion_iniciada');
 
     console.log("Validador Antifraude esperando transacciones...");
