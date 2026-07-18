@@ -14,19 +14,31 @@ spec:
       labels:
         app: servicio-1-procesador
     spec:
+      # Reparte las 2 replicas entre las 2 VMs: si una maquina cae,
+      # la replica de la otra sigue atendiendo (alta disponibilidad)
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: servicio-1-procesador
       containers:
         - name: servicio-1
-          # La imagen la publica GitHub Actions en el registro publico
-          image: ghcr.io/crissspi/grupo-3-pasarela-de-pagos/servicio-1-procesador:latest
+          # La imagen la publica GitHub Actions en Docker Hub
+          # (DOCKERHUB_USER se reemplaza por sed durante el deploy)
+          image: DOCKERHUB_USER/procesador-transacciones:latest
+          imagePullPolicy: Always
           ports:
             - containerPort: 3001
           env:
             - name: RABBITMQ_URL
-              value: amqp://rabbitmq
-            - name: DB_HOST
-              value: db-svc1
-            - name: DB_NAME
-              value: transacciones_db
+              value: amqp://admin:admin123@rabbitmq
+            # El codigo del Svc1 usa connectionString, no DB_HOST
+            - name: DATABASE_URL
+              value: postgres://postgres:postgres@db-svc1:5432/transacciones_db
+            - name: PORT
+              value: "3001"
           readinessProbe:
             httpGet:
               path: /health

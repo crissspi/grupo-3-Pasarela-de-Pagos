@@ -1,0 +1,13 @@
+{
+  "name": "servicio-2-validador",
+  "version": "1.0.0",
+  "description": "Microservicio Validador Antifraude y Saldo",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "amqplib": "^0.10.3",
+    "pg": "^8.11.3"
+  }
+}

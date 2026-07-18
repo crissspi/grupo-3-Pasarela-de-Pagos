@@ -13,14 +13,27 @@ spec:
       labels:
         app: servicio-3-comprobantes
     spec:
+      # Reparte las 2 replicas entre las 2 VMs (alta disponibilidad)
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: servicio-3-comprobantes
       containers:
         - name: servicio-3
-          image: ghcr.io/crissspi/grupo-3-pasarela-de-pagos/servicio-3-comprobantes:latest
+          image: DOCKERHUB_USER/emision-comprobantes:latest
+          imagePullPolicy: Always
           env:
             - name: RABBITMQ_URL
-              value: amqp://rabbitmq
+              value: amqp://admin:admin123@rabbitmq
             - name: DB_HOST
               value: db-svc3
+            - name: DB_USER
+              value: postgres
+            - name: DB_PASSWORD
+              value: postgres
             - name: DB_NAME
               value: comprobantes_db
 # Sin Service: nadie le habla por red, solo consume de RabbitMQ

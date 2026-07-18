@@ -27,6 +27,13 @@ spec:
       containers:
         - name: rabbitmq
           image: rabbitmq:3-management-alpine
+          # Sin esto solo existiria el usuario "guest", que RabbitMQ
+          # bloquea para conexiones remotas (otros pods)
+          env:
+            - name: RABBITMQ_DEFAULT_USER
+              value: admin
+            - name: RABBITMQ_DEFAULT_PASS
+              value: admin123
           ports:
             - containerPort: 5672   # AMQP (mensajes)
             - containerPort: 15672  # panel de administracion
@@ -38,6 +45,9 @@ spec:
               command: ["rabbitmq-diagnostics", "ping"]
             initialDelaySeconds: 15
             periodSeconds: 10
+            # el CLI de Erlang tarda varios segundos en las VMs de la U;
+            # con el timeout por defecto (1s) el probe fallaba siempre
+            timeoutSeconds: 10
       volumes:
         - name: data
           persistentVolumeClaim:

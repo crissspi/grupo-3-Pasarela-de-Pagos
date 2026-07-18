@@ -13,9 +13,18 @@ spec:
       labels:
         app: frontend
     spec:
+      # Reparte las 2 replicas entre las 2 VMs (alta disponibilidad)
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: frontend
       containers:
         - name: frontend
-          image: ghcr.io/crissspi/grupo-3-pasarela-de-pagos/frontend:latest
+          image: DOCKERHUB_USER/frontend-pagos:latest
+          imagePullPolicy: Always
           ports:
             - containerPort: 80
 ---

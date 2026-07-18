@@ -7,8 +7,33 @@ metadata:
   name: gateway-ingress
 spec:
   rules:
+    # Dominio "oficial" (requiere hosts file o resolver rules en el cliente)
     - host: qa.grupo3.uta.cl
       http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: api-gateway
+                port:
+                  number: 80
+    # nip.io: DNS publico comodin -> cualquier cliente con internet resuelve
+    # este nombre a 146.83.102.22 sin configurar nada (ni hosts ni DNS propio)
+    - host: qa.grupo3.146.83.102.22.nip.io
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: api-gateway
+                port:
+                  number: 80
+    # Regla SIN host: acceso directo por IP (http://146.83.102.22).
+    # Atrapa el trafico que no coincide con ningun dominio del cluster;
+    # QA se queda con el acceso por IP (solo un namespace puede tenerlo).
+    - http:
         paths:
           - path: /
             pathType: Prefix
