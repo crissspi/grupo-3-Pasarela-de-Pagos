@@ -16,6 +16,7 @@ kubectl apply -f k8s/servicio-1.yml -f k8s/servicio-2.yml -f k8s/servicio-3.yml 
 kubectl apply -f k8s/frontend.yml -f k8s/gateway.yml -n grupo3-qa
 kubectl apply -f k8s/ingress-qa.yml -n grupo3-qa
 kubectl apply -f k8s/backup-cronjob.yml -n grupo3-qa
+kubectl apply -f k8s/logging.yml -n grupo3-qa   # Loki + Promtail + Grafana
 
 # 3. Lo mismo en PROD (cambiando -n grupo3-prod e ingress-prod.yml)
 ```
@@ -48,11 +49,15 @@ kubectl delete pod -l app=db-svc3 -n grupo3-qa
 
 ## Nota sobre imágenes
 
-Los Deployments referencian `ghcr.io/crissspi/grupo-3-pasarela-de-pagos/<servicio>:latest`.
-Esas imágenes las construye y publica el workflow de GitHub Actions (Semana 4).
-Mientras no exista el workflow, se pueden construir localmente en la VM e importar a K3s:
+Los Deployments referencian `DOCKERHUB_USER/<servicio>:latest` como placeholder. El workflow
+de GitHub Actions ([.github/workflows/deploy.yml](../.github/workflows/deploy.yml)) construye
+y publica las 5 imágenes en Docker Hub, y reemplaza `DOCKERHUB_USER` por el usuario real
+(`secrets.DOCKER_USER`) con `sed` antes de aplicar los manifiestos. Para probar localmente sin
+pasar por Actions:
 
 ```bash
-docker build -t ghcr.io/crissspi/grupo-3-pasarela-de-pagos/servicio-1-procesador:latest ./servicio-1-procesador
-docker save ghcr.io/crissspi/grupo-3-pasarela-de-pagos/servicio-1-procesador:latest | sudo k3s ctr images import -
+docker build -t <tu-usuario-dockerhub>/procesador-transacciones:latest ./servicio-1-procesador
+docker push <tu-usuario-dockerhub>/procesador-transacciones:latest
+# o, para importar directo a K3s sin pasar por el registro:
+docker save <tu-usuario-dockerhub>/procesador-transacciones:latest | sudo k3s ctr images import -
 ```

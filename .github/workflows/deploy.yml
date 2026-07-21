@@ -96,6 +96,7 @@ jobs:
             -f /tmp/k8s-deploy/gateway.yml \
             -f /tmp/k8s-deploy/frontend.yml \
             -f /tmp/k8s-deploy/backup-cronjob.yml \
+            -f /tmp/k8s-deploy/logging.yml \
             -f /tmp/k8s-deploy/$INGRESS
 
           # Fuerza a los pods a bajar las imágenes :latest recién publicadas

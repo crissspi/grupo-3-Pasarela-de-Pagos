@@ -63,6 +63,7 @@ deploy_ns() {
       -f "/tmp/k8s-$NS/gateway.yml" \
       -f "/tmp/k8s-$NS/frontend.yml" \
       -f "/tmp/k8s-$NS/backup-cronjob.yml" \
+      -f "/tmp/k8s-$NS/logging.yml" \
       -f "/tmp/k8s-$NS/$INGRESS"
     # Fuerza a bajar las imagenes :latest recien publicadas por Actions
     k3s kubectl rollout restart deployment -n "$NS"
