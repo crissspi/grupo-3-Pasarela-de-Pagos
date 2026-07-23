@@ -5,6 +5,12 @@ metadata:
   name: frontend
 spec:
   replicas: 2
+  # Rolling update con cero downtime (ver servicio-1.yml)
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
   selector:
     matchLabels:
       app: frontend
@@ -27,6 +33,20 @@ spec:
           imagePullPolicy: Always
           ports:
             - containerPort: 80
+          # Frontend estatico: readiness/liveness verifican que nginx sirve la raiz.
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 15
+            periodSeconds: 15
+            failureThreshold: 3
 ---
 apiVersion: v1
 kind: Service

@@ -6,6 +6,13 @@ metadata:
   name: servicio-2-validador
 spec:
   replicas: 2
+  # Rolling update ordenado: mantiene siempre un consumidor conectado al broker
+  # durante el despliegue (no se acumulan mensajes sin procesar).
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
   selector:
     matchLabels:
       app: servicio-2-validador

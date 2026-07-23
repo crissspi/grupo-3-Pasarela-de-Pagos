@@ -6,6 +6,14 @@ metadata:
   name: servicio-1-procesador
 spec:
   replicas: 2
+  # Rolling update con cero downtime: primero levanta el pod NUEVO (maxSurge: 1)
+  # y solo cuando pasa su readinessProbe retira el VIEJO (maxUnavailable: 0).
+  # Nunca hay menos de 2 replicas atendiendo durante un despliegue.
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
   selector:
     matchLabels:
       app: servicio-1-procesador
@@ -39,12 +47,25 @@ spec:
               value: postgres://postgres:postgres@db-svc1:5432/transacciones_db
             - name: PORT
               value: "3001"
+          # Readiness: "listo para recibir trafico". Empieza a los 10s (arranque
+          # de la app + conexion a BD/RabbitMQ). Si falla, K8s saca este pod de los
+          # Endpoints del Service (deja de mandarle pagos) sin matarlo.
           readinessProbe:
             httpGet:
               path: /health
               port: 3001
             initialDelaySeconds: 10
             periodSeconds: 10
+          # Liveness: "sigo vivo". Arranca a los 20s (despues del readiness, para no
+          # reiniciar durante el arranque normal). failureThreshold 3 x 15s = 45s de
+          # gracia antes de reiniciar, para no matar el pod por un pico transitorio.
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3001
+            initialDelaySeconds: 20
+            periodSeconds: 15
+            failureThreshold: 3
 ---
 apiVersion: v1
 kind: Service
